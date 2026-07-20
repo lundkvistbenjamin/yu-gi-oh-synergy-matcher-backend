@@ -1,32 +1,33 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 import joblib
 import os
 import pandas as pd
 
-# 1. Initialize the Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# 2. Automatic CORS configuration (FastAPI handles OPTIONS requests automatically)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="Duelist Synergy API",
+    docs_url=None, # Disables automatic Swagger UI documentation for production security
+    redoc_url=None # Disables ReDoc documentation
 )
 
-# 3. Vercel-friendly absolute pathing
+# 1. CORS Configuration
+ALLOWED_ORIGINS = [
+    "https://yu-gi-oh-synergy-matcher-frontend.vercel.app"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["POST", "GET"], # Restrict to only the methods your app actually uses
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+# Vercel-friendly absolute path mapping
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 
-# Lazy load cache to optimize serverless cold starts on Vercel
+# Lazy-load cache to optimize serverless cold starts
 MODEL_CACHE = {}
 
 def load_resources():
@@ -36,7 +37,8 @@ def load_resources():
             MODEL_CACHE['encoders'] = joblib.load(os.path.join(MODELS_DIR, "label_encoders.joblib"))
             MODEL_CACHE['target_encoder'] = joblib.load(os.path.join(MODELS_DIR, "target_encoder.joblib"))
         except Exception as e:
-            raise RuntimeError(f"Model loading failed: {e}")
+            # Prevent exposing internal system directory strings to the client in production
+            raise RuntimeError("Backend serialization engines failed to initialize.")
     return MODEL_CACHE['model'], MODEL_CACHE['encoders'], MODEL_CACHE['target_encoder']
 
 
@@ -47,7 +49,10 @@ def health_check():
 
 @app.get("/api/metadata")
 def get_metadata():
-    _, encoders, _ = load_resources()
+    try:
+        _, encoders, _ = load_resources()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Metadata service currently unavailable.")
     
     def clean_labels(encoder):
         return [
@@ -68,32 +73,39 @@ def get_metadata():
 
 
 @app.post("/api/predict")
-@limiter.limit("10/minute")
-async def predict(request: Request, stats: dict):
-    model, encoders, target_encoder = load_resources()
+async def predict(stats: dict):
+    # Robust input validation protecting the ML pipeline from malicious payloads
+    if not stats or not isinstance(stats, dict):
+        raise HTTPException(status_code=400, detail="Invalid request payload structure.")
 
-    # Safely extract and parse numerical inputs, defaulting to -1
+    try:
+        model, encoders, target_encoder = load_resources()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Prediction engine configuration error.")
+
+    # Explicit input scrubbing and bounds protection
     def safe_int(key):
         val = stats.get(key)
         if val is None or str(val).strip() == "":
             return -1
         try:
             parsed = int(float(val))
-            return parsed if parsed >= 0 else -1
-        except ValueError:
+            # Enforce reasonable numeric boundaries to prevent overflow attacks
+            return parsed if 0 <= parsed <= 99999 else -1
+        except (ValueError, TypeError):
             return -1
 
     # Format input data structurally matching the training dataset
     input_df = pd.DataFrame({
-        'type': [stats.get('type', '')],
-        'race': [stats.get('race', '')],
+        'type': [str(stats.get('type', '')).strip()],
+        'race': [str(stats.get('race', '')).strip()],
         'atk': [safe_int('atk')],
         'def': [safe_int('def') if 'def' in stats else safe_int('defense')],
         'level': [safe_int('level')],
-        'attribute': [stats.get('attribute', '')]
+        'attribute': [str(stats.get('attribute', '')).strip()]
     })
     
-    # Encode categorical columns securely
+    # Secure categorical value confirmation
     for col in ['type', 'race', 'attribute']:
         le = encoders[col]
         val = input_df[col].iloc[0]
@@ -103,11 +115,12 @@ async def predict(request: Request, stats: dict):
         else:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Value '{val}' for field '{col}' was not found in the training dataset."
+                detail=f"Malformed parameters: Attribute mapping anomaly."
             )
 
-    # Make and reverse-transform prediction
-    prediction_idx = model.predict(input_df)[0]
-    archetype = target_encoder.inverse_transform([prediction_idx])[0]
-    
-    return {"prediction": archetype}
+    try:
+        prediction_idx = model.predict(input_df)[0]
+        archetype = target_encoder.inverse_transform([prediction_idx])[0]
+        return {"prediction": str(archetype)}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Algorithmic parsing exception.")
