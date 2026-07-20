@@ -37,6 +37,8 @@ def load_resources():
             MODEL_CACHE['encoders'] = joblib.load(os.path.join(MODELS_DIR, "label_encoders.joblib"))
             MODEL_CACHE['target_encoder'] = joblib.load(os.path.join(MODELS_DIR, "target_encoder.joblib"))
         except Exception as e:
+            # Print the actual traceback out to the Vercel logging window
+            print(f"[DEBUG LOG] Resource loading failed: {str(e)}")
             # Prevent exposing internal system directory strings to the client in production
             raise RuntimeError("Backend serialization engines failed to initialize.")
     return MODEL_CACHE['model'], MODEL_CACHE['encoders'], MODEL_CACHE['target_encoder']
@@ -51,7 +53,8 @@ def health_check():
 def get_metadata():
     try:
         _, encoders, _ = load_resources()
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG LOG] Metadata service error: {str(e)}")
         raise HTTPException(status_code=500, detail="Metadata service currently unavailable.")
     
     def clean_labels(encoder):
@@ -80,7 +83,8 @@ async def predict(stats: dict):
 
     try:
         model, encoders, target_encoder = load_resources()
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG LOG] Prediction resource fetch failure: {str(e)}")
         raise HTTPException(status_code=500, detail="Prediction engine configuration error.")
 
     # Explicit input scrubbing and bounds protection
@@ -113,6 +117,7 @@ async def predict(stats: dict):
         if val in le.classes_:
             input_df[col] = le.transform([val])[0]
         else:
+            print(f"[DEBUG LOG] Anomaly validation break. Column: {col}, Value provided: {val}")
             raise HTTPException(
                 status_code=400, 
                 detail=f"Malformed parameters: Attribute mapping anomaly."
@@ -122,5 +127,6 @@ async def predict(stats: dict):
         prediction_idx = model.predict(input_df)[0]
         archetype = target_encoder.inverse_transform([prediction_idx])[0]
         return {"prediction": str(archetype)}
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG LOG] Model prediction step exception: {str(e)}")
         raise HTTPException(status_code=500, detail="Algorithmic parsing exception.")
