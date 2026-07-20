@@ -1,19 +1,15 @@
 {
     "version": 2,
-    "builds": [
-        {
-            "src": "main.py",
-            "use": "@vercel/python",
-            "config": {
-                "includeFiles": "models/**",
-                "excludeFiles": "{venv/**,pipeline/**,data/**,.git/**}"
-            }
-        }
-    ],
     "routes": [
         {
             "src": "/(.*)",
             "dest": "main.py"
         }
-    ]
+    ],
+    "functions": {
+        "main.py": {
+            "includeFiles": "models/**",
+            "excludeFiles": "{venv/**,pipeline/**,data/**,.git/**}"
+        }
+    }
 }
