@@ -2,19 +2,24 @@
     "version": 2,
     "builds": [
         {
-            "src": "app/main.py",
+            "src": "main.py",
             "use": "@vercel/python"
         }
     ],
     "routes": [
         {
             "src": "/(.*)",
-            "dest": "app/main.py"
+            "dest": "main.py"
         }
     ],
     "functions": {
-        "app/main.py": {
-            "excludeFiles": "venv/**, pipeline/**, data/**, .git/**"
+        "main.py": {
+            "excludeFiles": [
+                "venv/**",
+                "pipeline/**",
+                "data/**",
+                ".git/**"
+            ]
         }
     }
 }
