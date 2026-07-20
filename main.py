@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import joblib
 import os
-import pandas as pd
+import numpy as np
 
 app = FastAPI(
     title="Duelist Synergy API",
@@ -99,23 +99,14 @@ async def predict(stats: dict):
         except (ValueError, TypeError):
             return -1
 
-    # Format input data structurally matching the training dataset
-    input_df = pd.DataFrame({
-        'type': [str(stats.get('type', '')).strip()],
-        'race': [str(stats.get('race', '')).strip()],
-        'atk': [safe_int('atk')],
-        'def': [safe_int('def') if 'def' in stats else safe_int('defense')],
-        'level': [safe_int('level')],
-        'attribute': [str(stats.get('attribute', '')).strip()]
-    })
-    
-    # Secure categorical value confirmation
+    # Extract, clean, and validate features using fast dictionary assignments
+    processed_features = {}
     for col in ['type', 'race', 'attribute']:
+        val = str(stats.get(col, '')).strip()
         le = encoders[col]
-        val = input_df[col].iloc[0]
         
         if val in le.classes_:
-            input_df[col] = le.transform([val])[0]
+            processed_features[col] = le.transform([val])[0]
         else:
             print(f"[DEBUG LOG] Anomaly validation break. Column: {col}, Value provided: {val}")
             raise HTTPException(
@@ -123,8 +114,19 @@ async def predict(stats: dict):
                 detail=f"Malformed parameters: Attribute mapping anomaly."
             )
 
+    # Compile data vector aligned explicitly to match structural training columns:
+    # ['type', 'race', 'atk', 'def', 'level', 'attribute']
+    feature_vector = np.array([[
+        processed_features['type'],
+        processed_features['race'],
+        safe_int('atk'),
+        safe_int('def') if 'def' in stats else safe_int('defense'),
+        safe_int('level'),
+        processed_features['attribute']
+    ]])
+
     try:
-        prediction_idx = model.predict(input_df)[0]
+        prediction_idx = model.predict(feature_vector)[0]
         archetype = target_encoder.inverse_transform([prediction_idx])[0]
         return {"prediction": str(archetype)}
     except Exception as e:
