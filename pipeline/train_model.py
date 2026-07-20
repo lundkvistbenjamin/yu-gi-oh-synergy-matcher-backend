@@ -33,7 +33,7 @@ X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=
 
 # Initialize and train the Logistic Regression model
 # Using saga solver with a max_iter cap for robust multi-class processing
-model = LogisticRegression(max_iter=1000, solver='saga')
+model = LogisticRegression(max_iter=2000, solver='saga', class_weight='balanced')
 model.fit(X_train, y_train)
 
 # Ensure the output directory exists
