@@ -33,9 +33,9 @@ MODEL_CACHE = {}
 def load_resources():
     if not MODEL_CACHE:
         try:
-            MODEL_CACHE['model'] = joblib.load(os.path.join(MODELS_DIR, "archetype_model.joblib"))
-            MODEL_CACHE['encoders'] = joblib.load(os.path.join(MODELS_DIR, "label_encoders.joblib"))
-            MODEL_CACHE['target_encoder'] = joblib.load(os.path.join(MODELS_DIR, "target_encoder.joblib"))
+            MODEL_CACHE['model'] = joblib.load(os.path.join(MODELS_DIR, "archetype_model.joblib"), mmap_mode='r')
+            MODEL_CACHE['encoders'] = joblib.load(os.path.join(MODELS_DIR, "label_encoders.joblib"), mmap_mode='r')
+            MODEL_CACHE['target_encoder'] = joblib.load(os.path.join(MODELS_DIR, "target_encoder.joblib"), mmap_mode='r')
         except Exception as e:
             # Prevent exposing internal system directory strings to the client in production
             raise RuntimeError("Backend serialization engines failed to initialize.")
