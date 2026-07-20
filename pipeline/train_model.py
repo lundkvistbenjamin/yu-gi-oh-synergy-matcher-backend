@@ -1,5 +1,5 @@
 import pandas as pd
-import joblib
+import json
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -32,17 +32,27 @@ target = target_encoder.fit_transform(target)
 X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2)
 
 # Initialize and train the Logistic Regression model
-# Swapped from Random Forest to drastically optimize runtime memory consumption on Vercel.
-# Uses 'saga' solver for multiclass efficiency and higher iterations to ensure model convergence.
 model = LogisticRegression(solver='saga', max_iter=1000, random_state=42)
 model.fit(X_train, y_train)
 
 # Ensure the output directory exists
 os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
 
-# Save the model and encoders so our web app can use them
-joblib.dump(model, os.path.join(BASE_DIR, "models", "archetype_model.joblib"), compress=3)
-joblib.dump(label_encoders, os.path.join(BASE_DIR, "models", "label_encoders.joblib"), compress=3)
-joblib.dump(target_encoder, os.path.join(BASE_DIR, "models", "target_encoder.joblib"), compress=3)
+# EXTRACT RAW MATHEMATICAL DATA FOR ULTRA-LIGHTWEIGHT DEPLOYMENT
+# We convert the Scikit-Learn matrices directly into basic Python lists
+model_data = {
+    "classes": target_encoder.classes_.tolist(),
+    "intercept": model.intercept_.tolist(),
+    "coefficients": model.coef_.tolist(),
+    "encoders": {
+        "type": label_encoders['type'].classes_.tolist(),
+        "race": label_encoders['race'].classes_.tolist(),
+        "attribute": label_encoders['attribute'].classes_.tolist()
+    }
+}
 
-print("Model trained and saved to models/!")
+# Write directly to a plain text JSON file (a few kilobytes total)
+with open(os.path.join(BASE_DIR, "models", "model_data.json"), "w") as f:
+    json.dump(model_data, f)
+
+print("Lightweight model coefficients successfully exported to models/model_data.json!")

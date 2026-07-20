@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import joblib
 import os
-import pandas as pd
+import json
 
 app = FastAPI(
     title="Duelist Synergy API",
@@ -25,7 +24,7 @@ app.add_middleware(
 
 # Vercel-friendly absolute path mapping
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR = os.path.join(BASE_DIR, "models")
+MODEL_JSON_PATH = os.path.join(BASE_DIR, "models", "model_data.json")
 
 # Lazy-load cache to optimize serverless cold starts
 MODEL_CACHE = {}
@@ -33,13 +32,11 @@ MODEL_CACHE = {}
 def load_resources():
     if not MODEL_CACHE:
         try:
-            MODEL_CACHE['model'] = joblib.load(os.path.join(MODELS_DIR, "archetype_model.joblib"))
-            MODEL_CACHE['encoders'] = joblib.load(os.path.join(MODELS_DIR, "label_encoders.joblib"))
-            MODEL_CACHE['target_encoder'] = joblib.load(os.path.join(MODELS_DIR, "target_encoder.joblib"))
-        except Exception as e:
-            # Prevent exposing internal system directory strings to the client in production
+            with open(MODEL_JSON_PATH, "r") as f:
+                MODEL_CACHE['data'] = json.load(f)
+        except Exception:
             raise RuntimeError("Backend serialization engines failed to initialize.")
-    return MODEL_CACHE['model'], MODEL_CACHE['encoders'], MODEL_CACHE['target_encoder']
+    return MODEL_CACHE['data']
 
 
 @app.get("/api/health")
@@ -50,13 +47,15 @@ def health_check():
 @app.get("/api/metadata")
 def get_metadata():
     try:
-        _, encoders, _ = load_resources()
+        data = load_resources()
     except Exception:
         raise HTTPException(status_code=500, detail="Metadata service currently unavailable.")
     
-    def clean_labels(encoder):
+    encoders = data["encoders"]
+    
+    def clean_labels(class_list):
         return [
-            str(label) for label in encoder.classes_ 
+            str(label) for label in class_list 
             if label is not None and str(label).lower() != 'nan' and str(label).upper() != 'NONE'
         ]
 
@@ -79,7 +78,7 @@ async def predict(stats: dict):
         raise HTTPException(status_code=400, detail="Invalid request payload structure.")
 
     try:
-        model, encoders, target_encoder = load_resources()
+        data = load_resources()
     except Exception:
         raise HTTPException(status_code=500, detail="Prediction engine configuration error.")
 
@@ -95,32 +94,60 @@ async def predict(stats: dict):
         except (ValueError, TypeError):
             return -1
 
-    # Format input data structurally matching the training dataset
-    input_df = pd.DataFrame({
-        'type': [str(stats.get('type', '')).strip()],
-        'race': [str(stats.get('race', '')).strip()],
-        'atk': [safe_int('atk')],
-        'def': [safe_int('def') if 'def' in stats else safe_int('defense')],
-        'level': [safe_int('level')],
-        'attribute': [str(stats.get('attribute', '')).strip()]
-    })
+    # Extract strings safely matching the structure expected by our encoders
+    input_strings = {
+        'type': str(stats.get('type', '')).strip(),
+        'race': str(stats.get('race', '')).strip(),
+        'attribute': str(stats.get('attribute', '')).strip()
+    }
     
-    # Secure categorical value confirmation
-    for col in ['type', 'race', 'attribute']:
-        le = encoders[col]
-        val = input_df[col].iloc[0]
-        
-        if val in le.classes_:
-            input_df[col] = le.transform([val])[0]
+    # Secure categorical value confirmation using primitive list lookups
+    encoded_features = []
+    for col in ['type', 'race']:
+        classes = data["encoders"][col]
+        val = input_strings[col]
+        if val in classes:
+            encoded_features.append(classes.index(val))
         else:
             raise HTTPException(
                 status_code=400, 
                 detail=f"Malformed parameters: Attribute mapping anomaly."
             )
+            
+    # Add our raw continuous numeric features safely
+    encoded_features.append(safe_int('atk'))
+    encoded_features.append(safe_int('def') if 'def' in stats else safe_int('defense'))
+    encoded_features.append(safe_int('level'))
+    
+    # Add final categorical feature (attribute)
+    attr_classes = data["encoders"]["attribute"]
+    attr_val = input_strings['attribute']
+    if attr_val in attr_classes:
+        encoded_features.append(attr_classes.index(attr_val))
+    else:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Malformed parameters: Attribute mapping anomaly."
+        )
 
     try:
-        prediction_idx = model.predict(input_df)[0]
-        archetype = target_encoder.inverse_transform([prediction_idx])[0]
+        # PURE PYTHON MATRIX MATHEMATICS FOR INFRASTRUCTURE PROTECTION
+        # Computes dot product across all classes using only plain integers/floats
+        coefficients = data["coefficients"]
+        intercepts = data["intercept"]
+        classes = data["classes"]
+        
+        best_class_idx = 0
+        max_score = float('-inf')
+        
+        for i in range(len(classes)):
+            # Calculate linear combinations: score = dot_product(weights, features) + intercept
+            current_score = sum(encoded_features[j] * coefficients[i][j] for j in range(len(encoded_features))) + intercepts[i]
+            if current_score > max_score:
+                max_score = current_score
+                best_class_idx = i
+                
+        archetype = classes[best_class_idx]
         return {"prediction": str(archetype)}
     except Exception:
         raise HTTPException(status_code=500, detail="Algorithmic parsing exception.")
