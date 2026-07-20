@@ -14,12 +14,7 @@
     ],
     "functions": {
         "main.py": {
-            "excludeFiles": [
-                "venv/**",
-                "pipeline/**",
-                "data/**",
-                ".git/**"
-            ]
+            "excludeFiles": "{venv/**,pipeline/**,data/**,.git/**}"
         }
     }
 }
