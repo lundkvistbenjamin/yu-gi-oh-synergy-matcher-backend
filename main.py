@@ -24,7 +24,7 @@ app.add_middleware(
 )
 
 # Vercel-friendly absolute path mapping
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 # Lazy-load cache to optimize serverless cold starts
