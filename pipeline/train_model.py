@@ -2,7 +2,7 @@ import pandas as pd
 import joblib
 import os
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
 # Get the directory of the current script to build absolute paths
@@ -31,9 +31,14 @@ target = target_encoder.fit_transform(target)
 # Split data: 80% for training, 20% for testing
 X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2)
 
-# Initialize and train the Logistic Regression model
-# Using saga solver with a max_iter cap for robust multi-class processing
-model = LogisticRegression(max_iter=2000, solver='saga', class_weight='balanced')
+# Initialize and train the Random Forest
+# Strict hyperparameter constraints used to enforce a low memory footprint on Vercel
+model = RandomForestClassifier(
+    n_estimators=30, 
+    max_depth=12, 
+    min_samples_leaf=4, 
+    class_weight="balanced"
+)
 model.fit(X_train, y_train)
 
 # Ensure the output directory exists
