@@ -56,10 +56,10 @@ def get_metadata():
     except Exception as e:
         print(f"[DEBUG LOG] Metadata service error: {str(e)}")
         raise HTTPException(status_code=500, detail="Metadata service currently unavailable.")
-        
+    
     def clean_labels(encoder):
         return [
-            str(label) for label in encoder.classes_
+            str(label) for label in encoder.classes_ 
             if label is not None and str(label).lower() != 'nan' and str(label).upper() != 'NONE'
         ]
 
@@ -68,8 +68,8 @@ def get_metadata():
         "races": clean_labels(encoders['race']),
         "attributes": clean_labels(encoders['attribute']),
         "monster_types": [
-            "Effect Monster", "Normal Monster", "Fusion Monster", "Synchro Monster",
-            "XYZ Monster", "Link Monster", "Pendulum Effect Monster",
+            "Effect Monster", "Normal Monster", "Fusion Monster", "Synchro Monster", 
+            "XYZ Monster", "Link Monster", "Pendulum Effect Monster", 
             "Union Effect Monster", "Tuner Monster"
         ]
     }
@@ -113,12 +113,13 @@ async def predict(stats: dict):
     for col in ['type', 'race', 'attribute']:
         le = encoders[col]
         val = input_df[col].iloc[0]
+        
         if val in le.classes_:
             input_df[col] = le.transform([val])[0]
         else:
             print(f"[DEBUG LOG] Anomaly validation break. Column: {col}, Value provided: {val}")
             raise HTTPException(
-                status_code=400,
+                status_code=400, 
                 detail=f"Malformed parameters: Attribute mapping anomaly."
             )
 
