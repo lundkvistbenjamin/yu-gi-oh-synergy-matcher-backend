@@ -23,7 +23,7 @@ print(f"Loaded DataFrame shape before filtering: {df.shape}")
 
 # Filter out rare/junk archetypes with fewer than 5 cards to prevent class imbalance noise
 counts = df['archetype'].value_counts()
-valid_archetypes = counts[counts >= 5].index
+valid_archetypes = counts[counts >= 10].index
 df = df[df['archetype'].isin(valid_archetypes)]
 
 print(f"DataFrame shape after filtering low-frequency archetypes (>= 5 cards): {df.shape}")

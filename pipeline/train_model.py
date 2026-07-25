@@ -34,10 +34,9 @@ X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=
 # Initialize and train the Random Forest
 # Strict hyperparameter constraints used to enforce a low memory footprint on Vercel
 model = RandomForestClassifier(
-    n_estimators=60, 
+    n_estimators=100, 
     max_depth=18, 
     min_samples_leaf=2, 
-    class_weight="balanced",
     random_state=42
 )
 model.fit(X_train, y_train)
