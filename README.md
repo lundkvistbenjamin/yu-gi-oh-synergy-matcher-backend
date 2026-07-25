@@ -1,1 +1,1 @@
-# yu-gi-oh-synergy-matcher-backend
+# yu-gi-oh-synergy-matcher
