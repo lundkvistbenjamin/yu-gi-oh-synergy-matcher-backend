@@ -126,9 +126,28 @@ async def predict(stats: dict):
     ]])
 
     try:
-        prediction_idx = model.predict(feature_vector)[0]
-        archetype = target_encoder.inverse_transform([prediction_idx])[0]
-        return {"prediction": str(archetype)}
+        # Obtain prediction probabilities for all classes
+        probabilities = model.predict_proba(feature_vector)[0]
+        
+        # Get top 3 predicted class indices sorted by probability descending
+        top_3_indices = np.argsort(probabilities)[::-1][:3]
+        
+        # Decode top predictions and form response structure
+        top_predictions = []
+        for idx in top_3_indices:
+            archetype_name = target_encoder.inverse_transform([idx])[0]
+            confidence = round(float(probabilities[idx]) * 100, 2)
+            top_predictions.append({
+                "archetype": str(archetype_name),
+                "confidence": confidence
+            })
+
+        top_prediction = top_predictions[0]["archetype"]
+
+        return {
+            "prediction": str(top_prediction),
+            "top_predictions": top_predictions
+        }
     except Exception as e:
         print(f"[DEBUG LOG] Model prediction step exception: {str(e)}")
         raise HTTPException(status_code=500, detail="Algorithmic parsing exception.")

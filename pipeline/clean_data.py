@@ -19,7 +19,14 @@ df = pd.DataFrame(cards)
 columns_to_keep = ["name", "type", "race", "atk", "def", "level", "attribute", "archetype"]
 df = df[columns_to_keep]
 
-print(f"Loaded DataFrame shape: {df.shape}")
+print(f"Loaded DataFrame shape before filtering: {df.shape}")
+
+# Filter out rare/junk archetypes with fewer than 5 cards to prevent class imbalance noise
+counts = df['archetype'].value_counts()
+valid_archetypes = counts[counts >= 5].index
+df = df[df['archetype'].isin(valid_archetypes)]
+
+print(f"DataFrame shape after filtering low-frequency archetypes (>= 5 cards): {df.shape}")
 
 # Fill missing numerical fields
 df['atk'] = df['atk'].fillna(-1)

@@ -28,13 +28,16 @@ except requests.RequestException as e:
     print(f"Error fetching data from API: {e}")
     exit(1)
 
-# Filter out cards that do not belong to an archetype
+# Filter out cards that do not belong to an archetype or are Spells/Traps
 filtered_cards = []
 for card in raw_cards:
     if "archetype" in card:
-        filtered_cards.append(card)
+        card_type = str(card.get("type", ""))
+        # Exclude Spells and Traps since they do not have Monster stats (ATK/DEF/Level/Attribute)
+        if card_type not in ["Spell Card", "Trap Card"]:
+            filtered_cards.append(card)
 
-print(f"Filtered down to {len(filtered_cards)} cards with valid archetypes.")
+print(f"Filtered down to {len(filtered_cards)} monster cards with valid archetypes.")
 
 # Save our curated list to a local JSON file
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
