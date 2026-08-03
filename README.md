@@ -10,6 +10,10 @@ The backend architecture manages dataset transformations and model inference wor
 * Training compressed Random Forest classifiers optimized for low-memory serverless deployments
 * Exposing CORS-restricted REST endpoints to process incoming prediction queries asynchronously
 
+## Live Demo
+
+Access the active deployment here: [Yu-Gi-Oh! Synergy Matcher Client](https://yu-gi-oh-synergy-matcher-frontend.vercel.app/)
+
 ## Features
 
 ### Data Pipeline and Feature Engineering
