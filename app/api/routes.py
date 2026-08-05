@@ -17,7 +17,7 @@ def get_metadata():
     try:
         _, encoders, _ = ModelService.load_resources()
     except Exception as e:
-        logger.error(f"Metadata service error: {str(e)}")
+        logger.error(f"[DEBUG LOG] Metadata service error: {str(e)}")
         raise HTTPException(status_code=500, detail="Metadata service currently unavailable.")
     
     def clean_labels(encoder):
@@ -38,9 +38,10 @@ async def predict(payload: CardPredictionRequest):
     try:
         model, encoders, target_encoder = ModelService.load_resources()
     except Exception as e:
-        logger.error(f"Prediction resource fetch failure: {str(e)}")
+        logger.error(f"[DEBUG LOG] Prediction resource fetch failure: {str(e)}")
         raise HTTPException(status_code=500, detail="Prediction engine configuration error.")
 
+    # Extract, clean, and validate features using fast dictionary assignments
     processed_features = {}
     for col in ['type', 'race', 'attribute']:
         val = getattr(payload, col).strip()
@@ -49,12 +50,14 @@ async def predict(payload: CardPredictionRequest):
         if val in le.classes_:
             processed_features[col] = le.transform([val])[0]
         else:
-            logger.warning(f"Anomaly validation break. Column: {col}, Value provided: {val}")
+            logger.warning(f"[DEBUG LOG] Anomaly validation break. Column: {col}, Value provided: {val}")
             raise HTTPException(
                 status_code=400, 
                 detail="Malformed parameters: Attribute mapping anomaly."
             )
 
+    # Compile data vector aligned explicitly to match structural training columns:
+    # ['type', 'race', 'atk', 'def', 'level', 'attribute']
     feature_vector = np.array([[
         processed_features['type'],
         processed_features['race'],
@@ -65,9 +68,13 @@ async def predict(payload: CardPredictionRequest):
     ]])
 
     try:
+        # Obtain prediction probabilities for all classes
         probabilities = model.predict_proba(feature_vector)[0]
+        
+        # Get top 3 predicted class indices sorted by probability descending
         top_3_indices = np.argsort(probabilities)[::-1][:3]
         
+        # Decode top predictions and form response structure
         top_predictions = []
         for idx in top_3_indices:
             archetype_name = target_encoder.inverse_transform([idx])[0]
@@ -77,10 +84,12 @@ async def predict(payload: CardPredictionRequest):
                 "confidence": confidence
             })
 
+        top_prediction = top_predictions[0]["archetype"]
+
         return {
-            "prediction": top_predictions[0]["archetype"],
+            "prediction": str(top_prediction),
             "top_predictions": top_predictions
         }
     except Exception as e:
-        logger.error(f"Model prediction step exception: {str(e)}")
+        logger.error(f"[DEBUG LOG] Model prediction step exception: {str(e)}")
         raise HTTPException(status_code=500, detail="Algorithmic parsing exception.")

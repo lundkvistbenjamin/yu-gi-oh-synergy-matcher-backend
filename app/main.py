@@ -4,16 +4,17 @@ from app.config import ALLOWED_ORIGINS
 from app.api.routes import router
 
 app = FastAPI(
-    title="Yu-Gi-Oh! Synergy Matcher API",
-    docs_url=None,
-    redoc_url=None
+    title="Duelist Synergy API",
+    docs_url=None, # Disables automatic Swagger UI documentation for production security
+    redoc_url=None # Disables ReDoc documentation
 )
 
+# 1. CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "GET", "OPTIONS"], # Explicitly allow OPTIONS for CORS preflight
     allow_headers=["Content-Type", "Authorization"],
 )
 
