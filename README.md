@@ -1,70 +1,101 @@
-# Yu-Gi-Oh! Synergy Matcher Engine
+# Yu-Gi-Oh! Synergy Matcher Backend
 
-A high-performance machine learning backend and API service engineered to ingest card datasets, train random forest classification models, and serve real-time archetype compatibility predictions.
+**Live Demo (Frontend):** https://yu-gi-oh-synergy-matcher-frontend.vercel.app/
 
-## Overview
+**Frontend Repository:** https://github.com/lundkvistbenjamin/yu-gi-oh-synergy-matcher-frontend
 
-The backend architecture manages dataset transformations and model inference workflows by:
-* Ingesting raw card JSON records from the YGOPRODeck public API
-* Sanitizing missing values, encoding categorical text fields, and compiling clean feature vectors
-* Training compressed Random Forest classifiers optimized for low-memory serverless deployments
-* Exposing CORS-restricted REST endpoints to process incoming prediction queries asynchronously
+Yu-Gi-Oh! Synergy Matcher Engine is a machine learning backend that predicts the most likely archetype for a Yu-Gi-Oh! monster card based on its attributes and statistics. The project combines a data preparation pipeline, a Random Forest classification model, and a FastAPI server to deliver real-time predictions through a lightweight REST API.
 
-## Features
+## Core Features
 
-### Data Pipeline and Feature Engineering
-* Automated ingestion routines filtering out non-archetype card entries
-* Vector cleaning that imputes missing numerical statistics and normalizes categorical features
-* Scikit-learn LabelEncoder serialization ensuring deterministic feature mapping between pipeline runs
+### Automated Data Pipeline
 
-### Machine Learning and Optimization
-* Memory-constrained Random Forest configuration using strict depth caps and compressed serialization (`joblib` with high compression)
-* Lazy-loading resource cache within FastAPI contexts to minimize serverless cold starts
-* Inverse target decoding returning human-readable archetype classifications from internal predictions
+The project includes a complete preprocessing pipeline that downloads card data directly from the YGOPRODeck API, filters unsupported records, cleans missing values, and prepares structured datasets for model training.
 
-### Security and API Protection
-* Input sanitization enforcing numerical boundaries (0-99999) to protect against parameter overflow attacks
-* Strict CORS policy restricting cross-origin requests exclusively to the production frontend domain
-* Explicit error handling that suppresses internal system stack traces from client-facing HTTP responses
-* Hardened production configuration disabling public Swagger and ReDoc documentation routes
+### Random Forest Classification
 
-## System Architecture
+A Scikit-learn Random Forest model is trained on cleaned monster card data to recognize archetype patterns from card attributes such as type, race, attribute, attack, defense, and level. Trained models and encoders are serialized with Joblib for efficient deployment.
 
-The service operates across an isolated three-phase ML pipeline:
+### FastAPI Prediction Service
 
-1. **Ingestion & Data Cleansing (`pipeline/`):** Fetches card datasets, filters records with missing archetypes, cleans null fields, and exports structured CSV tabular data.
-2. **Model Training (`pipeline/train_model.py`):** Encodes text features, fits a balanced Random Forest Classifier, and serializes compiled model artifacts and encodings to binary assets.
-3. **Inference API Layer (`main.py`):** Runs a FastAPI server that receives incoming card parameters, constructs feature arrays dynamically, and predicts matching archetypes in real time.
+The backend exposes REST endpoints for health checks, metadata retrieval, and archetype prediction. Model resources are loaded lazily to reduce serverless cold-start overhead while maintaining fast inference times.
 
-## Technical Details
+### Production-Oriented API Design
 
-### Resource Management Strategy
-To operate within tight serverless memory limits, model components are loaded lazily upon the first incoming request rather than during initial script evaluation. Serialized joblib artifacts utilize `compress=3` to reduce footprint sizes, ensuring rapid cold-start initialization and optimal execution throughput.
+The API includes strict input validation, CORS protection, controlled error handling, and disabled Swagger documentation in production environments. Predictions return both the highest-confidence archetype and the top three ranked predictions.
 
-### Dependencies and Tech Stack
-* **Runtime Environment:** Python 3.11+
-* **Web Framework:** FastAPI / Uvicorn
-* **Machine Learning Engine:** `scikit-learn`, `pandas`, `numpy`
-* **Model Serialization:** `joblib`
-* **Data Ingestion:** `requests`
-* **Deployment Target:** Vercel Serverless Functions
+## Tech Stack
 
-## Output Interpretation
+### Backend
 
-* **Health Endpoint (`/api/health`):** Returns service status checks for runtime monitoring.
-* **Metadata Endpoint (`/api/metadata`):** Returns valid categories for dropdown population and feature alignment.
-* **Prediction Endpoint (`/api/predict`):** Evaluates input feature vectors and returns the predicted archetype string.
+- Python 3.11
+- FastAPI
+- Uvicorn
 
-## Limitations
+### Machine Learning
 
-* Model training parameters are strictly constrained to remain within Vercel's serverless RAM memory boundaries.
-* Prediction accuracy is inherently bounded by the subset of cards with explicitly labeled archetypes in the YGOPRODeck database.
-* Data updates require executing the offline pipeline scripts and re-deploying updated model artifacts.
+- Scikit-learn
+- Pandas
+- NumPy
+- Joblib
 
-## Security Note
+### Data Pipeline
 
-Service endpoint routes enforce strict input boundary checks and CORS verification. System exceptions during dataset processing log internally for debugging while returning generic status codes to prevent environment exposure.
+- Requests
+- JSON
+- CSV preprocessing
+
+### Deployment
+
+- Vercel Serverless Functions
+
+## Project Structure
+
+```text
+.
+├── data/
+│   ├── raw_cards.json          # Downloaded YGOPRODeck dataset
+│   └── clean_cards.csv         # Cleaned training dataset
+├── models/
+│   ├── archetype_model.joblib
+│   ├── label_encoders.joblib
+│   └── target_encoder.joblib
+├── pipeline/
+│   ├── fetch_data.py           # Download latest card dataset
+│   ├── clean_data.py           # Prepare training dataset
+│   └── train_model.py          # Train and serialize model
+├── main.py                     # FastAPI application
+├── requirements.txt
+├── README.md
+└── LICENSE
+```
+
+## Machine Learning Pipeline
+
+The model is built through a three-stage workflow:
+
+1. **Data Collection** – Download the latest monster card data from the YGOPRODeck API.
+2. **Data Preparation** – Filter unsupported records, clean missing values, encode categorical features, and generate the training dataset.
+3. **Model Training** – Train a Random Forest classifier and serialize the trained model together with its label encoders for production inference.
+
+The pipeline scripts are intended to be executed manually whenever a new dataset or model version is required.
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/api/health` | Returns the service health status |
+| `/api/metadata` | Returns valid card types, races, and attributes |
+| `/api/predict` | Predicts the most likely archetype and confidence scores |
+
+## Performance & Reliability
+
+To improve serverless performance, trained models are loaded only when the first prediction request is received and then cached for subsequent requests. The backend also validates incoming payloads, restricts cross-origin requests to the production frontend, and sanitizes numerical inputs before inference.
+
+## Security
+
+Only the production frontend is permitted through the CORS policy. Incoming requests undergo validation before reaching the machine learning model, while internal exceptions are logged server-side without exposing implementation details to API consumers.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the **LICENSE** file for more information.
