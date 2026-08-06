@@ -1,8 +1,8 @@
 # Yu-Gi-Oh! Synergy Matcher Backend
 
-**Live Demo (Frontend):** [https://duelistsynergy.vercel.app/](https://duelistsynergy.vercel.app/)
+**Live Demo (Frontend):** https://duelistsynergy.vercel.app/
 
-**Frontend Repository:** [https://github.com/lundkvistbenjamin/yu-gi-oh-synergy-matcher-frontend](https://github.com/lundkvistbenjamin/yu-gi-oh-synergy-matcher-frontend)
+**Frontend Repository:** https://github.com/lundkvistbenjamin/yu-gi-oh-synergy-matcher-frontend
 
 Yu-Gi-Oh! Synergy Matcher Engine is a machine learning backend that predicts the most likely archetype for a Yu-Gi-Oh! monster card based on its attributes and statistics. The project combines a data preparation pipeline, a Random Forest classification model, and a FastAPI server to deliver real-time predictions through a lightweight REST API.
 
