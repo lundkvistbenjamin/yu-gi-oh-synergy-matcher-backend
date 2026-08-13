@@ -1,6 +1,6 @@
 # Yu-Gi-Oh! Synergy Matcher Backend
 
-**Live Demo (Frontend):** https://duelistsynergy.vercel.app/
+**Live Demo (Frontend):** https://duelistsynergy.vercel.app
 
 **Frontend Repository:** https://github.com/lundkvistbenjamin/yu-gi-oh-synergy-matcher-frontend
 
